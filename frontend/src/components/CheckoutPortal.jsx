@@ -6,6 +6,7 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponLoading, setCouponLoading] = useState(false);
+  const [discount, setDiscount] = useState(0);
 
   const [addressType, setAddressType] = useState('GUEST'); // 'GUEST', 'SAVED'
   const [addressForm, setAddressForm] = useState({
@@ -233,11 +234,43 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {cart.map(item => (
+                  
                   <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                      <div style={{ width: '60px', height: '60px', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                        📦
-                      </div>
+                     <div
+  style={{
+    width: '60px',
+    height: '60px',
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '6px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden'
+  }}
+>
+  {item.image ? (
+  <img
+    src={
+      item.image.startsWith('http')
+        ? item.image
+        : `http://localhost:8080${item.image}`
+    }
+    alt={item.productName || item.name}
+    style={{
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover'
+    }}
+    onError={(e) => {
+      e.currentTarget.style.display = 'none';
+    }}
+  />
+) : (
+  <span style={{ fontSize: '1.5rem' }}>📦</span>
+)}
+</div>
                       <div>
                         <h4 style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.productName || item.name}</h4>
                         <p style={{ color: 'var(--secondary)', fontWeight: 700 }}>₹{item.price}</p>

@@ -243,12 +243,28 @@ export const api = {
   },
 
   // --- MODULE 2: CART, CHECKOUT, & PAYMENT ---
-  cart: {
-    get: (userId) => apiRequest(`/api/v1/cart?userId=${userId}`, { method: 'GET' }),
-    addItem: (itemData) => apiRequest('/api/v1/cart/items', { method: 'POST', body: itemData }),
-    updateItem: (id, updateData) => apiRequest(`/api/v1/cart/items/${id}`, { method: 'PATCH', body: updateData }),
-    removeItem: (id) => apiRequest(`/api/v1/cart/items/${id}`, { method: 'DELETE' }),
-  },
+ cart: {
+  get: (userId) => apiRequest(`/api/v1/cart?userId=${userId}`, { method: 'GET' }),
+
+  addItem: (itemData) => apiRequest(`/api/v1/cart/items?userId=${itemData.userId}`, {
+    method: 'POST',
+    body: {
+      productId: itemData.productId,
+      quantity: itemData.quantity,
+    },
+  }),
+
+  updateItem: (id, updateData) => apiRequest(`/api/v1/cart/items/${id}?userId=${updateData.userId}`, {
+    method: 'PATCH',
+    body: {
+      quantity: updateData.quantity,
+    },
+  }),
+
+  removeItem: (id, userId) => apiRequest(`/api/v1/cart/items/${id}?userId=${userId}`, {
+    method: 'DELETE',
+  }),
+},
 
   wishlist: {
   getWishlist: (userId) => apiRequest(`/api/v1/wishlist?userId=${userId}`, { method: 'GET' }),

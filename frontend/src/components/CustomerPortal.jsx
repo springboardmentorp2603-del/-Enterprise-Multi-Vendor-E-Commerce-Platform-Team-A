@@ -145,7 +145,9 @@ export default function CustomerPortal({ user, cart, setCart, addToast }) {
     return;
   }
 
-  const existing = cart.find(item => item.id === product.id);
+  const existing = cart.find(item =>
+  item.product?.id === product.id || item.id === product.id
+);
   const currentQuantity = existing ? Number(existing.quantity) : 0;
 
   // Frontend limit check
@@ -177,7 +179,7 @@ export default function CustomerPortal({ user, cart, setCart, addToast }) {
     if (existing) {
       setCart(
         cart.map(item =>
-          item.id === product.id
+          (item.product?.id === product.id || item.id === product.id)
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )

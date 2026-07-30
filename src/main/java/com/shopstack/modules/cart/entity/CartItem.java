@@ -2,6 +2,7 @@ package com.shopstack.modules.cart.entity;
 
 import com.shopstack.common.audit.BaseEntity;
 import com.shopstack.modules.product.entity.Product;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,10 +15,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class CartItem extends BaseEntity {
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id", nullable = false)
     private Cart cart;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;

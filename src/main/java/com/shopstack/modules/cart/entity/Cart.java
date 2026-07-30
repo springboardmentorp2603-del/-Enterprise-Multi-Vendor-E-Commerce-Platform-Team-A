@@ -1,5 +1,6 @@
 package com.shopstack.modules.cart.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.shopstack.common.audit.BaseEntity;
 import com.shopstack.modules.user.entity.User;
 import jakarta.persistence.*;
@@ -17,6 +18,7 @@ import java.util.List;
 @NoArgsConstructor
 public class Cart extends BaseEntity {
 
+    @JsonIgnore
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
