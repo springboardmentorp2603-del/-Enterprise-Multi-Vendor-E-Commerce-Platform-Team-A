@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
+import CouponManagementPage from './CouponManagementPage';
 
 export default function AdminPortal({ user, addToast }) {
   const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'vendors', 'products', 'categories', 'staff', 'customers'
@@ -218,6 +219,9 @@ export default function AdminPortal({ user, addToast }) {
         <button className={`sidebar-link ${activeTab === 'categories' ? 'active' : ''}`} onClick={() => setActiveTab('categories')}>
           📂 Category Taxonomy
         </button>
+        <button className={`sidebar-link ${activeTab === 'coupons' ? 'active' : ''}`} onClick={() => setActiveTab('coupons')}>
+          🎟️ Coupon Management
+        </button>
         <button className={`sidebar-link ${activeTab === 'staff' ? 'active' : ''}`} onClick={() => setActiveTab('staff')}>
           🛡️ Provision Accounts
         </button>
@@ -228,6 +232,10 @@ export default function AdminPortal({ user, addToast }) {
 
       {/* Main Workspace Area */}
       <div className="main-content" style={{ textAlign: 'left' }}>
+        
+        {activeTab === 'coupons' && (
+          <CouponManagementPage addToast={addToast} />
+        )}
         
         {loading && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
