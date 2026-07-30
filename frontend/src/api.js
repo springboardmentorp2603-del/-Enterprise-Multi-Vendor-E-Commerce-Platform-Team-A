@@ -296,4 +296,30 @@ export const api = {
   invoices: {
     getByOrder: (orderId) => apiRequest(`/api/v1/invoices/order/${orderId}`, { method: 'GET' }),
   },
+  coupons: {
+    validate: (payload) => apiRequest('/api/v1/coupons/validate', {
+      method: 'POST',
+      body: payload,
+    }),
+    create: (couponData) => apiRequest('/api/v1/coupons', {
+      method: 'POST',
+      body: couponData,
+    }),
+    list: () => apiRequest('/api/v1/coupons', {
+      method: 'GET',
+    }),
+    getById: (id) => apiRequest(`/api/v1/coupons/${id}`, {
+      method: 'GET',
+    }),
+    update: (id, couponData) => apiRequest(`/api/v1/coupons/${id}`, {
+      method: 'PUT',
+      body: couponData,
+    }),
+    deactivate: (id) => apiRequest(`/api/v1/coupons/${id}/deactivate`, {
+      method: 'POST',
+    }),
+    getAnalytics: (id) => apiRequest(`/api/v1/coupons/${id}/analytics`, {
+      method: 'GET',
+    }),
+  },
 };

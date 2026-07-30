@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import AvailabilityBadge from './AvailabilityBadge';
 import OrderList from './OrderList';
+import CouponManagementPage from './CouponManagementPage';
 
 export default function VendorPortal({ user, addToast }) {
   const [vendorProfile, setVendorProfile] = useState(null);
@@ -483,6 +484,9 @@ const [discountDrafts, setDiscountDrafts] = useState({});
         <button className={`btn ${activeTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('orders')}>
           🛒 Customer Orders
         </button>
+        <button className={`btn ${activeTab === 'coupons' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('coupons')}>
+          🎟️ Coupons
+        </button>
         <button className={`btn ${activeTab === 'profile' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('profile')}>
           💼 Business Profile
         </button>
@@ -902,6 +906,12 @@ const [discountDrafts, setDiscountDrafts] = useState({});
         <div>
           <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, marginBottom: '1.5rem' }}>Customer Orders Management</h3>
           <OrderList isVendor={true} addToast={addToast} />
+        </div>
+      )}
+
+      {activeTab === 'coupons' && (
+        <div>
+          <CouponManagementPage addToast={addToast} />
         </div>
       )}
     </div>

@@ -4,7 +4,8 @@ import { api } from '../api';
 export default function CheckoutPortal({ user, cart, setCart, addToast, onComplete }) {
   const [step, setStep] = useState('CART'); // 'CART', 'ADDRESS', 'PAYMENT', 'RESULT'
   const [couponCode, setCouponCode] = useState('');
-  const [discount, setDiscount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const [addressType, setAddressType] = useState('GUEST'); // 'GUEST', 'SAVED'
   const [addressForm, setAddressForm] = useState({
@@ -26,14 +27,47 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
   const gst = cartSubtotal * 0.18; // 18% GST
   const grandTotal = cartSubtotal + shippingCost + gst - discount;
 
-  const handleApplyCoupon = () => {
-    if (couponCode.toUpperCase() === 'SAVE10') {
-      setDiscount(cartSubtotal * 0.1);
-      addToast('Coupon applied successfully!', 'success');
-    } else {
-      addToast('Invalid coupon code', 'error');
-      setDiscount(0);
+  const handleApplyCoupon = async () => {
+    if (!couponCode || !couponCode.trim()) {
+      addToast('Please enter a coupon code', 'warning');
+      return;
     }
+    setCouponLoading(true);
+    try {
+      const response = await api.coupons.validate({
+        code: couponCode.trim(),
+        cartTotal: cartSubtotal,
+      });
+
+      const data = response.data || response;
+      if (data && (data.valid || data.discountAmount !== undefined)) {
+        const discountAmt = Number(data.discountAmount) || 0;
+        setDiscount(discountAmt);
+        setAppliedCoupon({
+          code: data.code || couponCode.trim().toUpperCase(),
+          discountAmount: discountAmt,
+          couponId: data.couponId,
+        });
+        addToast(response.message || `Coupon '${data.code || couponCode}' applied successfully!`, 'success');
+      } else {
+        setDiscount(0);
+        setAppliedCoupon(null);
+        addToast('Coupon is invalid or cannot be applied', 'error');
+      }
+    } catch (err) {
+      setDiscount(0);
+      setAppliedCoupon(null);
+      addToast(err.message || 'Failed to validate coupon', 'error');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode('');
+    setDiscount(0);
+    setAppliedCoupon(null);
+    addToast('Coupon removed', 'info');
   };
 
   const handleProceedToAddress = () => {
@@ -73,7 +107,7 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
           userId: user ? user.id : '00000000-0000-0000-0000-000000000000',
           shippingAddress: shippingAddress,  // ✅ Send actual address!
           paymentMethod: paymentMethod,
-          couponCode: couponCode,
+          couponCode: appliedCoupon ? appliedCoupon.code : couponCode.trim(),
           items: cartItemsPayload,
         };
 
@@ -224,9 +258,36 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
               </div>
             )}
 
-            <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
-              <input type="text" className="form-input" placeholder="Coupon Code (try SAVE10)" value={couponCode} onChange={e => setCouponCode(e.target.value)} style={{ flex: 1 }} />
-              <button className="btn btn-secondary" onClick={handleApplyCoupon}>Apply Coupon</button>
+            <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter Coupon Code"
+                  value={couponCode}
+                  onChange={e => setCouponCode(e.target.value)}
+                  disabled={couponLoading || !!appliedCoupon}
+                  style={{ flex: 1, textTransform: 'uppercase' }}
+                />
+                {appliedCoupon ? (
+                  <button className="btn btn-danger" onClick={handleRemoveCoupon}>
+                    Remove Coupon
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading || !couponCode.trim()}
+                  >
+                    {couponLoading ? 'Validating...' : 'Apply Coupon'}
+                  </button>
+                )}
+              </div>
+              {appliedCoupon && (
+                <div style={{ fontSize: '0.85rem', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                  <span>✅ Code <strong>{appliedCoupon.code}</strong> applied (-₹{appliedCoupon.discountAmount.toFixed(2)})</span>
+                </div>
+              )}
             </div>
 
             <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -363,9 +424,17 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
               <span style={{ color: 'var(--text-primary)' }}>₹{gst.toFixed(2)}</span>
             </div>
             {discount > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
-                <span>Discount applied:</span>
-                <span style={{ fontWeight: 600 }}>₹{discount.toFixed(2)}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--success)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>Discount {appliedCoupon ? `(${appliedCoupon.code})` : ''}:</span>
+                  <button
+                    onClick={handleRemoveCoupon}
+                    style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.75rem', textDecoration: 'underline', padding: 0 }}
+                  >
+                    Remove
+                  </button>
+                </div>
+                <span style={{ fontWeight: 600 }}>-₹{discount.toFixed(2)}</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', paddingTop: '1.5rem', borderTop: '1px dashed var(--border-color)', fontSize: '1.3rem', fontWeight: 700, color: 'var(--secondary)' }}>
