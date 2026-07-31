@@ -86,6 +86,15 @@ public class VendorController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{vendorId}/commission-rate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<VendorResponse> updateCommissionRate(
+            @PathVariable Long vendorId,
+            @RequestBody java.util.Map<String, java.math.BigDecimal> request) {
+        java.math.BigDecimal rate = request.get("commissionRate");
+        return ResponseEntity.ok(vendorService.updateCommissionRate(vendorId, rate));
+    }
+
     // ---- Addresses, bank details, documents ----
 
     @PostMapping("/{vendorId}/addresses")

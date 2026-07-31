@@ -16,4 +16,9 @@ public class AdminDashboardStatsResponse {
     private long totalProducts;
 
     private long totalCustomers;
+
+    private long totalOrders;
+    private long pendingOrders;
+    private java.math.BigDecimal totalRevenue;
+    private java.math.BigDecimal totalCommissionEarned;
 }

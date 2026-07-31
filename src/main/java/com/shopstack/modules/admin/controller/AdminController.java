@@ -57,6 +57,7 @@ public class AdminController {
     private final SecurityUtil securityUtil;
     private final AuthService authService;
     private final AdminDashboardService dashboardService;
+    private final com.shopstack.modules.systemlog.service.SystemLogService systemLogService;
 
     // =====================================================================
     // Dashboard summary
@@ -127,7 +128,9 @@ public class AdminController {
                 .remarks(remarks)
                 .build();
 
-        return ApiResponseBuilder.success(successMessage, vendorService.reviewVendor(approvalRequest));
+        var result = vendorService.reviewVendor(approvalRequest);
+        systemLogService.log("VENDOR", successMessage, admin.getId(), admin.getName());
+        return ApiResponseBuilder.success(successMessage, result);
     }
 
     // =====================================================================
@@ -154,8 +157,9 @@ public class AdminController {
                                                          @RequestBody(required = false) AdminReviewRequest request) {
         User admin = securityUtil.getCurrentUser();
         String remarks = request != null ? request.getRemarks() : null;
-        return ApiResponseBuilder.success("Product approved successfully",
-                productService.approveProduct(id, admin.getId(), remarks));
+       var result = productService.approveProduct(id, admin.getId(), remarks);
+        systemLogService.log("PRODUCT", "Product approved successfully", admin.getId(), admin.getName());
+        return ApiResponseBuilder.success("Product approved successfully", result);
     }
 
     @PostMapping("/products/{id}/reject")
@@ -163,8 +167,9 @@ public class AdminController {
                                                         @RequestBody(required = false) AdminReviewRequest request) {
         User admin = securityUtil.getCurrentUser();
         String remarks = request != null ? request.getRemarks() : null;
-        return ApiResponseBuilder.success("Product rejected successfully",
-                productService.rejectProduct(id, admin.getId(), remarks));
+       var result = productService.rejectProduct(id, admin.getId(), remarks);
+        systemLogService.log("PRODUCT", "Product rejected successfully", admin.getId(), admin.getName());
+        return ApiResponseBuilder.success("Product rejected successfully", result);
     }
 
     // =====================================================================

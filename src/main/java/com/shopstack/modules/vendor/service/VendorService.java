@@ -24,6 +24,8 @@ public interface VendorService {
 
     VendorResponse updateVendor(Long vendorId, VendorUpdateRequest request);
 
+    VendorResponse updateCommissionRate(Long vendorId, java.math.BigDecimal commissionRate);
+
     void deleteVendor(Long vendorId);
 
     VendorResponse addAddress(Long vendorId, VendorAddressRequest request);

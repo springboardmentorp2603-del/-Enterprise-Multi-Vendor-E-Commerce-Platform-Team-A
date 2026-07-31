@@ -138,6 +138,17 @@ public class VendorServiceImpl implements VendorService {
     }
 
     @Override
+    public VendorResponse updateCommissionRate(Long vendorId, java.math.BigDecimal commissionRate) {
+        if (commissionRate == null || commissionRate.compareTo(java.math.BigDecimal.ZERO) < 0
+                || commissionRate.compareTo(java.math.BigDecimal.valueOf(100)) > 0) {
+            throw new com.shopstack.common.exception.BadRequestException("Commission rate must be between 0 and 100");
+        }
+        Vendor vendor = findVendorOrThrow(vendorId);
+        vendor.setCommissionRate(commissionRate);
+        return mapper.toResponse(vendorRepository.save(vendor));
+    }
+
+    @Override
     public void deleteVendor(Long vendorId) {
         Vendor vendor = findVendorOrThrow(vendorId);
         vendorRepository.delete(vendor);
