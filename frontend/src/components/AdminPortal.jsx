@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import CouponManagementPage from './CouponManagementPage';
+import ReportDashboard from './ReportDashboard';
+import SystemLogPanel from './SystemLogPanel';
 
 export default function AdminPortal({ user, addToast }) {
   const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'vendors', 'products', 'categories', 'staff', 'customers'
@@ -222,6 +224,12 @@ export default function AdminPortal({ user, addToast }) {
         <button className={`sidebar-link ${activeTab === 'coupons' ? 'active' : ''}`} onClick={() => setActiveTab('coupons')}>
           🎟️ Coupon Management
         </button>
+<button className={`sidebar-link ${activeTab === 'reports' ? 'active' : ''}`} onClick={() => setActiveTab('reports')}>
+  📊 Reports
+</button>
+<button className={`sidebar-link ${activeTab === 'systemLogs' ? 'active' : ''}`} onClick={() => setActiveTab('systemLogs')}>
+  🗒️ System Logs
+</button>
         <button className={`sidebar-link ${activeTab === 'staff' ? 'active' : ''}`} onClick={() => setActiveTab('staff')}>
           🛡️ Provision Accounts
         </button>
@@ -537,6 +545,14 @@ export default function AdminPortal({ user, addToast }) {
           </div>
         )}
 
+        {/* Render Reports Tab */}
+        {activeTab === 'reports' && (
+          <ReportDashboard addToast={addToast} />
+        )}
+        {/* Render System Logs Tab */}
+        {activeTab === 'systemLogs' && (
+          <SystemLogPanel addToast={addToast} />
+        )}
         {/* MODAL: VENDOR DETAILED APPROVAL */}
         {selectedVendor && (
           <div className="modal-overlay" onClick={() => setSelectedVendor(null)}>

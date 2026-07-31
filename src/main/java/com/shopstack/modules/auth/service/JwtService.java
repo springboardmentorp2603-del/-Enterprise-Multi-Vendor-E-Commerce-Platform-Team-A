@@ -17,7 +17,7 @@ public class JwtService {
     // Secret and expiration are externalized to config (application*.properties / env vars)
     // instead of being hardcoded, so every environment (and every developer) doesn't share the
     // same signing key. Set JWT_SECRET_KEY as an environment variable in production.
-    @Value("${application.security.jwt.secret-key}")
+    @Value("${application.security.jwt.secret-key:ReplaceThisWithA256BitSecretKeyForDevelopmentOnly123456789}")
     private String secret;
 
     @Value("${application.security.jwt.expiration:86400000}")

@@ -240,6 +240,34 @@ export const api = {
     listCustomers: () => apiRequest('/admin/customers', {
       method: 'GET',
     }),
+    // --- NEW: Reports
+    getReports: () => apiRequest('/admin/reports', {
+      method: 'GET',
+    }),
+    // --- NEW: System Logs
+    getSystemLogs: () => apiRequest('/admin/system-logs', {
+      method: 'GET',
+    }),
+    // --- NEW: Reports ---
+    getSalesReport: (from, to) => apiRequest(`/admin/reports/sales?from=${from}&to=${to}`, {
+      method: 'GET',
+    }),
+    getVendorReport: (from, to) => apiRequest(`/admin/reports/vendors?from=${from}&to=${to}`, {
+      method: 'GET',
+    }),
+    getOrderReport: (from, to, status) => {
+      const query = `?from=${from}&to=${to}` + (status ? `&status=${status}` : '');
+      return apiRequest(`/admin/reports/orders${query}`, {
+        method: 'GET',
+      });
+    },
+    getFinancialReport: (from, to) => apiRequest(`/admin/reports/financial?from=${from}&to=${to}`, {
+      method: 'GET',
+    }),
+    // --- NEW: System Logs ---
+    getSystemLogs: () => apiRequest('/admin/system-logs', {
+      method: 'GET',
+    }),
   },
 
   // --- MODULE 2: CART, CHECKOUT, & PAYMENT ---
