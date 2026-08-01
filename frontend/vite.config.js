@@ -26,6 +26,10 @@ export default defineConfig({
       '/invoice-files': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+      },
+      '/report-files': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
       }
       }
     }

@@ -41,7 +41,7 @@ public class SecurityConfig {
                 // ---- Public: customer sign-up & product/category browsing ----
                 .requestMatchers(HttpMethod.POST, "/api/v1/customers").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
-                .requestMatchers("/uploads/**", "/invoice-files/**").permitAll()
+                .requestMatchers("/uploads/**", "/invoice-files/**", "/report-files/**").permitAll()
 
                 .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").permitAll()
 

@@ -264,6 +264,12 @@ export const api = {
     getFinancialReport: (from, to) => apiRequest(`/admin/reports/financial?from=${from}&to=${to}`, {
       method: 'GET',
     }),
+    exportSalesReport: (from, to, format) => apiRequest(`/admin/reports/sales/export?from=${from}&to=${to}&format=${format}`, {
+      method: 'GET',
+    }),
+    exportVendorReport: (from, to) => apiRequest(`/admin/reports/vendors/export?from=${from}&to=${to}`, {
+      method: 'GET',
+    }),
     // --- NEW: System Logs ---
     getSystemLogs: () => apiRequest('/admin/system-logs', {
       method: 'GET',

@@ -16,4 +16,6 @@ public class SystemLogResponse {
     private String level;
     private String details;
     private LocalDateTime createdAt;
+    private LocalDateTime timestamp;
+    private String message;
 }

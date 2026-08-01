@@ -47,7 +47,8 @@ public class ReportService {
             BigDecimal revenue = entry.getValue().stream()
                     .filter(o -> !"CANCELLED".equalsIgnoreCase(o.getStatus()))
                     .map(o -> BigDecimal.valueOf(o.getTotalAmount()))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
 
             rows.add(SalesReportRow.builder()
                     .date(entry.getKey())
@@ -110,18 +111,20 @@ public class ReportService {
                 .collect(Collectors.toList());
     }
 
-    public FinancialReportRow getFinancialReport(LocalDate from, LocalDate to) {
+   public FinancialReportRow getFinancialReport(LocalDate from, LocalDate to) {
         List<SalesReportRow> sales = getSalesReport(from, to);
         List<VendorReportRow> vendorRows = getVendorReport(from, to);
 
         long totalOrders = sales.stream().mapToLong(SalesReportRow::getOrderCount).sum();
-        BigDecimal totalRevenue = sales.stream().map(SalesReportRow::getRevenue).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalCommission = vendorRows.stream().map(VendorReportRow::getCommissionEarned).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalRevenue = sales.stream().map(SalesReportRow::getRevenue).reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalCommission = vendorRows.stream().map(VendorReportRow::getCommissionEarned).reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal totalGst = totalRevenue.multiply(BigDecimal.valueOf(0.18))
                 .divide(BigDecimal.valueOf(1.18), 2, RoundingMode.HALF_UP);
 
-        BigDecimal netRevenue = totalRevenue.subtract(totalCommission);
+        BigDecimal netRevenue = totalRevenue.subtract(totalCommission).setScale(2, RoundingMode.HALF_UP);
 
         return FinancialReportRow.builder()
                 .totalOrders(totalOrders)

@@ -23,5 +23,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResourceLocations(uploadPath);
         registry.addResourceHandler("/invoice-files/**")
                 .addResourceLocations("file:invoice-files/");
+        registry.addResourceHandler("/report-files/**")
+                .addResourceLocations("file:report-files/");
     }
 }

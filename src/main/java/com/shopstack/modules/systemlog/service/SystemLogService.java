@@ -44,7 +44,10 @@ public class SystemLogService {
                 .collect(Collectors.toList());
     }
 
-    private SystemLogResponse toResponse(SystemLog log) {
+   private SystemLogResponse toResponse(SystemLog log) {
+        String composedMessage = "[" + log.getModule() + "] " + log.getAction()
+                + (log.getPerformedByName() != null ? " — by " + log.getPerformedByName() : "");
+
         return SystemLogResponse.builder()
                 .id(log.getId())
                 .module(log.getModule())
@@ -53,6 +56,8 @@ public class SystemLogService {
                 .level(log.getLevel())
                 .details(log.getDetails())
                 .createdAt(log.getCreatedAt())
+                .timestamp(log.getCreatedAt())
+                .message(composedMessage)
                 .build();
     }
 }

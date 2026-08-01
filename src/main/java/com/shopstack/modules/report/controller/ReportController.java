@@ -26,6 +26,23 @@ public class ReportController {
     private final ReportService reportService;
     private final ReportExportService reportExportService;
 
+    @GetMapping
+    public ApiResponse<List<Map<String, Object>>> getAllReports() {
+        LocalDate to = LocalDate.now();
+        LocalDate from = to.minusDays(30);
+
+        FinancialReportRow financial = reportService.getFinancialReport(from, to);
+
+        List<Map<String, Object>> summary = new java.util.ArrayList<>();
+        summary.add(Map.of("title", "Total Orders", "value", financial.getTotalOrders()));
+        summary.add(Map.of("title", "Total Revenue", "value", financial.getTotalRevenue()));
+        summary.add(Map.of("title", "GST Collected", "value", financial.getTotalGstCollected()));
+        summary.add(Map.of("title", "Commission Earned", "value", financial.getTotalCommissionEarned()));
+        summary.add(Map.of("title", "Net Revenue", "value", financial.getNetRevenue()));
+
+        return ApiResponseBuilder.success("Reports fetched", summary);
+    }
+
     @GetMapping("/sales")
     public ApiResponse<List<SalesReportRow>> salesReport(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
