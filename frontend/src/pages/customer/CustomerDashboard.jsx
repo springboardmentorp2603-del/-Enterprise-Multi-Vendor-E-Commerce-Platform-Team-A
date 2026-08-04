@@ -2,6 +2,7 @@ import useFilteredProducts from '../../hooks/useFilteredProducts';
 import ProductImage from '../../components/ProductImage';
 import EmptyState from '../../components/EmptyState';
 import NotificationPanel from '../../components/NotificationPanel';
+import AvailableCoupons from '../../components/AvailableCoupons';
 import { 
   Layers, 
   Search, 

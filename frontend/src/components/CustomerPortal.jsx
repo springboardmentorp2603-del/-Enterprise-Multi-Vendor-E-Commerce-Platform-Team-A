@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
+import AvailableCoupons from './AvailableCoupons';
 
 export default function CustomerPortal({ user, cart, setCart, addToast }) {
   const [activeTab, setActiveTab] = useState('shop'); // 'shop' or 'profile'
@@ -284,10 +285,21 @@ export default function CustomerPortal({ user, cart, setCart, addToast }) {
             👤 My Account
           </button>
         )}
+
+         <button 
+          className={`btn ${activeTab === 'offers' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('offers')}
+        >
+          🏷️ Offers
+        </button>
       </div>
 
-      {activeTab === 'shop' ? (
+
+      {activeTab === 'offers' ? (
+        <AvailableCoupons addToast={addToast} />
+      ) : activeTab === 'shop' ? (
         /* SHOP VIEW */
+
         <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '2rem' }}>
           {/* Filters Sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', textAlign: 'left' }}>

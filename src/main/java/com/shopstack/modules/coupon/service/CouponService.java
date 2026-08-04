@@ -5,6 +5,7 @@ import com.shopstack.modules.coupon.dto.requests.UpdateCouponRequest;
 import com.shopstack.modules.coupon.dto.responses.CouponAnalyticsResponse;
 import com.shopstack.modules.coupon.dto.responses.CouponResponse;
 import com.shopstack.modules.coupon.dto.responses.CouponValidationResponse;
+import com.shopstack.modules.coupon.dto.responses.PublicCouponResponse;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -27,4 +28,7 @@ public interface CouponService {
     void recordCouponUsage(UUID couponId, UUID userId, UUID orderId, BigDecimal discountApplied);
 
     CouponAnalyticsResponse getAnalytics(UUID id);
+
+    // cartTotal is optional (pass null to skip eligibility check)
+    List<PublicCouponResponse> getAvailableCoupons(java.math.BigDecimal cartTotal);
 }

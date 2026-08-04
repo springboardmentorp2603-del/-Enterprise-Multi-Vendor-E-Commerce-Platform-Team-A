@@ -15,6 +15,7 @@ import com.shopstack.modules.coupon.repository.CouponUsageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.shopstack.modules.coupon.dto.responses.PublicCouponResponse;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -198,6 +199,40 @@ public class CouponServiceImpl implements CouponService {
     private Coupon findCouponOrThrow(UUID id) {
         return couponRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Coupon not found"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PublicCouponResponse> getAvailableCoupons(BigDecimal cartTotal) {
+        LocalDateTime now = LocalDateTime.now();
+
+        return couponRepository.findByActiveTrue().stream()
+                .filter(c -> !now.isBefore(c.getValidFrom()) && !now.isAfter(c.getValidTo()))
+                .filter(c -> {
+                    if (c.getUsageLimitTotal() == null) return true;
+                    long usedSoFar = couponUsageRepository.countByCouponId(c.getId());
+                    return usedSoFar < c.getUsageLimitTotal();
+                })
+                .map(c -> {
+                    Boolean eligible = null;
+                    if (cartTotal != null) {
+                        eligible = c.getMinOrderAmount() == null
+                                || cartTotal.compareTo(c.getMinOrderAmount()) >= 0;
+                    }
+                    return PublicCouponResponse.builder()
+                            .id(c.getId())
+                            .code(c.getCode())
+                            .description(c.getDescription())
+                            .discountType(c.getDiscountType())
+                            .discountValue(c.getDiscountValue())
+                            .minOrderAmount(c.getMinOrderAmount())
+                            .maxDiscountAmount(c.getMaxDiscountAmount())
+                            .validTo(c.getValidTo())
+                            .vendorId(c.getVendorId())
+                            .eligibleForCart(eligible)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     private CouponResponse toResponse(Coupon coupon) {

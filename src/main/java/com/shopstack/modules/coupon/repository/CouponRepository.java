@@ -18,4 +18,6 @@ public interface CouponRepository extends JpaRepository<Coupon, UUID> {
     List<Coupon> findAllByOrderByCreatedAtDesc();
 
     List<Coupon> findByVendorId(Long vendorId);
+
+    List<Coupon> findByActiveTrue();
 }

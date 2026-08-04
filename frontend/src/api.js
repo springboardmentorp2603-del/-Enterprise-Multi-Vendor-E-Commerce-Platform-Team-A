@@ -346,11 +346,17 @@ export const api = {
   invoices: {
     getByOrder: (orderId) => apiRequest(`/api/v1/invoices/order/${orderId}`, { method: 'GET' }),
   },
+
   coupons: {
+    getAvailable: (cartTotal) => apiRequest(
+      `/api/v1/coupons/available${cartTotal ? `?cartTotal=${cartTotal}` : ''}`,
+      { method: 'GET' }
+    ),
     validate: (payload) => apiRequest('/api/v1/coupons/validate', {
       method: 'POST',
       body: payload,
     }),
+
     create: (couponData) => apiRequest('/api/v1/coupons', {
       method: 'POST',
       body: couponData,

@@ -57,6 +57,13 @@ public class CouponController {
         return ApiResponseBuilder.success("Coupon deactivated");
     }
 
+  // Public: browse currently valid coupons — no login required, optional cartTotal for eligibility check
+    @GetMapping("/available")
+    public ApiResponse<List<com.shopstack.modules.coupon.dto.responses.PublicCouponResponse>> getAvailableCoupons(
+            @RequestParam(required = false) java.math.BigDecimal cartTotal) {
+        return ApiResponseBuilder.success("Available coupons fetched", couponService.getAvailableCoupons(cartTotal));
+    }
+
     @PostMapping("/validate")
     public ApiResponse<CouponValidationResponse> validate(@Valid @RequestBody ValidateCouponRequest request) {
         UUID userId = resolveCurrentUserIdOrNull();

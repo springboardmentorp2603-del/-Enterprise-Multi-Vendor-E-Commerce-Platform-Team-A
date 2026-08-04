@@ -43,8 +43,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
                 .requestMatchers("/uploads/**", "/invoice-files/**", "/report-files/**").permitAll()
 
-                .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").permitAll()
-
+               .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/coupons/available").permitAll()
                 // ---- Vendor registration (allowed for any authenticated user) ----
                 .requestMatchers(HttpMethod.POST, "/api/v1/vendors").authenticated()
 

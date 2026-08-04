@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../api';
+import AvailableCoupons from './AvailableCoupons';
 
 export default function CheckoutPortal({ user, cart, setCart, addToast, onComplete }) {
   const [step, setStep] = useState('CART'); // 'CART', 'ADDRESS', 'PAYMENT', 'RESULT'
@@ -28,15 +29,17 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
   const gst = cartSubtotal * 0.18; // 18% GST
   const grandTotal = cartSubtotal + shippingCost + gst - discount;
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode || !couponCode.trim()) {
+
+ const handleApplyCoupon = async (overrideCode) => {
+    const codeToApply = overrideCode || couponCode;
+    if (!codeToApply || !codeToApply.trim()) {
       addToast('Please enter a coupon code', 'warning');
       return;
     }
     setCouponLoading(true);
     try {
       const response = await api.coupons.validate({
-        code: couponCode.trim(),
+        code: codeToApply.trim(),
         cartTotal: cartSubtotal,
       });
 
@@ -45,7 +48,7 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
         const discountAmt = Number(data.discountAmount) || 0;
         setDiscount(discountAmt);
         setAppliedCoupon({
-          code: data.code || couponCode.trim().toUpperCase(),
+          code: data.code || codeToApply.trim().toUpperCase(),
           discountAmount: discountAmt,
           couponId: data.couponId,
         });
@@ -292,6 +295,15 @@ export default function CheckoutPortal({ user, cart, setCart, addToast, onComple
             )}
 
             <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <AvailableCoupons
+                addToast={addToast}
+                cartTotal={cartSubtotal}
+                compact
+                onApply={(code) => {
+                  setCouponCode(code);
+                  handleApplyCoupon(code);
+                }}
+              />
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <input
                   type="text"
