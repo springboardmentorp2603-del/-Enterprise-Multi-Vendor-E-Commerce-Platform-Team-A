@@ -36,6 +36,8 @@ public class CheckoutService {
     private final UserRepository userRepository;
     private final PaymentService paymentService;
     private final CouponService couponService;
+    private final com.shopstack.modules.inventory.service.InventoryService inventoryService;
+    private final com.shopstack.modules.notification.service.NotificationService notificationService;
 
     @Transactional
     public Map<String, Object> processCheckout(Map<String, Object> checkoutRequest) {
@@ -139,7 +141,7 @@ public class CheckoutService {
         order.setUser(user);
         order.setAddressId(addressId);
         order.setTotalAmount(finalAmount);
-        order.setStatus("PENDING");
+        order.setStatus("COD".equalsIgnoreCase(paymentMethod) ? "CONFIRMED" : "PAYMENT_PENDING");
 
         order.setShippingAddress(shippingAddress);
 
@@ -151,6 +153,34 @@ public class CheckoutService {
         order.setItems(orderItems);
         order = orderRepository.save(order);
 
+        // Reserve stock in inventory
+        for (OrderItem item : orderItems) {
+            try {
+                inventoryService.reserveStock(
+                    UUID.fromString(item.getProductId()), 
+                    item.getQuantity(), 
+                    order.getId(), 
+                    user.getId()
+                );
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to reserve stock: " + e.getMessage(), e);
+            }
+        }
+
+        // Send Order Created Notification
+        try {
+            notificationService.sendNotification(
+                com.shopstack.modules.notification.dto.SendNotificationRequest.builder()
+                    .recipientId(user.getId())
+                    .recipientType("CUSTOMER")
+                    .type(com.shopstack.modules.notification.entity.NotificationType.ORDER_UPDATE)
+                    .channel(com.shopstack.modules.notification.entity.NotificationChannel.IN_APP)
+                    .title("Order Placed")
+                    .message("Your order #" + order.getId() + " has been placed. Status: " + order.getStatus())
+                    .build()
+            );
+        } catch (Exception ignored) {}
+
         if (appliedCouponId != null) {
             couponService.recordCouponUsage(appliedCouponId, targetUserId, order.getId(), discountApplied);
         }
@@ -161,8 +191,6 @@ public class CheckoutService {
         response.put("currency", "INR");
 
         if ("COD".equalsIgnoreCase(paymentMethod)) {
-            order.setStatus("CONFIRMED");
-            orderRepository.save(order);
             response.put("paymentId", null);
             response.put("status", "SUCCESS");
         } else {

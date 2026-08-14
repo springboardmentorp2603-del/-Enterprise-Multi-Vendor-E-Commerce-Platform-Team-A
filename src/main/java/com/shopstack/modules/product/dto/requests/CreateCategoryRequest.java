@@ -15,4 +15,6 @@ public class CreateCategoryRequest {
 
     @Size(max = 500)
     private String description;
+
+    private Boolean active = true;
 }

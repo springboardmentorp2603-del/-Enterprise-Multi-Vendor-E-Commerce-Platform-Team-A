@@ -28,6 +28,7 @@ export default function AdminPortal({ user, addToast }) {
   const [editingCategory, setEditingCategory] = useState(null);
   const [catName, setCatName] = useState('');
   const [catDesc, setCatDesc] = useState('');
+  const [catActive, setCatActive] = useState(true);
 
   // Staff Account Provisioning
   const [staffName, setStaffName] = useState('');
@@ -38,6 +39,24 @@ export default function AdminPortal({ user, addToast }) {
 
   // Customer List
   const [customers, setCustomers] = useState([]);
+
+  // Warehouses
+  const [warehouseCode, setWarehouseCode] = useState('');
+  const [warehouseName, setWarehouseName] = useState('');
+  const [warehouseAddress, setWarehouseAddress] = useState('');
+  const [warehouseCity, setWarehouseCity] = useState('');
+  const [warehouseState, setWarehouseState] = useState('');
+  const [warehouseZip, setWarehouseZip] = useState('');
+  const [warehouseCountry, setWarehouseCountry] = useState('');
+  const [warehouseCapacity, setWarehouseCapacity] = useState('100');
+  const [warehouseStatus, setWarehouseStatus] = useState('ACTIVE');
+  const [warehouses, setWarehouses] = useState([]);
+  const [adminOrders, setAdminOrders] = useState([]);
+
+  // Commission Rates
+  const [commissionRates, setCommissionRates] = useState([]);
+  const [rateCategory, setRateCategory] = useState('');
+  const [rateValue, setRateValue] = useState('');
 
   useEffect(() => {
     loadTabContent();
@@ -64,6 +83,17 @@ export default function AdminPortal({ user, addToast }) {
       } else if (activeTab === 'customers') {
         const customersResponse = await api.admin.listCustomers();
         setCustomers(customersResponse.data || customersResponse || []);
+      } else if (activeTab === 'warehouses') {
+        const warehousesResponse = await api.admin.listWarehouses();
+        setWarehouses(warehousesResponse.data || warehousesResponse || []);
+      } else if (activeTab === 'orders') {
+        const ordersRes = await api.orders.adminGetOrders();
+        setAdminOrders(ordersRes.data || ordersRes || []);
+      } else if (activeTab === 'commissionRates') {
+        const ratesRes = await api.categories.getCommissionRates();
+        const categoriesRes = await api.admin.listCategories();
+        setCommissionRates(ratesRes.data || ratesRes || []);
+        setCategories(categoriesRes.data || categoriesRes || []);
       }
     } catch (err) {
       addToast(err.message || 'Failed to fetch dashboard data', 'error');
@@ -139,11 +169,11 @@ export default function AdminPortal({ user, addToast }) {
     try {
       const payload = {
         categoryName: catName,
-        description: catDesc
+        description: catDesc,
+        active: catActive,
       };
 
       if (editingCategory) {
-        payload.active = true;
         await api.admin.updateCategory(editingCategory.id, payload);
         addToast('Category updated successfully!', 'success');
       } else {
@@ -153,6 +183,7 @@ export default function AdminPortal({ user, addToast }) {
 
       setCatName('');
       setCatDesc('');
+      setCatActive(true);
       setEditingCategory(null);
       setShowCategoryForm(false);
       loadTabContent();
@@ -165,6 +196,7 @@ export default function AdminPortal({ user, addToast }) {
     setEditingCategory(cat);
     setCatName(cat.categoryName || '');
     setCatDesc(cat.description || '');
+    setCatActive(cat.active !== false);
     setShowCategoryForm(true);
   };
 
@@ -176,6 +208,41 @@ export default function AdminPortal({ user, addToast }) {
       loadTabContent();
     } catch (err) {
       addToast(err.message || 'Failed to delete category', 'error');
+    }
+  };
+
+  const handleWarehouseCreate = async (e) => {
+    e.preventDefault();
+    if (!warehouseCode || !warehouseName || !warehouseAddress || !warehouseCity || !warehouseState || !warehouseZip || !warehouseCountry || !warehouseCapacity) {
+      addToast('Please complete all warehouse fields.', 'error');
+      return;
+    }
+
+    try {
+      await api.admin.createWarehouse({
+        code: warehouseCode,
+        name: warehouseName,
+        address: warehouseAddress,
+        city: warehouseCity,
+        state: warehouseState,
+        zipCode: warehouseZip,
+        country: warehouseCountry,
+        capacity: Number(warehouseCapacity),
+        status: warehouseStatus,
+      });
+      addToast(`Warehouse ${warehouseName} created successfully.`, 'success');
+      setWarehouseCode('');
+      setWarehouseName('');
+      setWarehouseAddress('');
+      setWarehouseCity('');
+      setWarehouseState('');
+      setWarehouseZip('');
+      setWarehouseCountry('');
+      setWarehouseCapacity('100');
+      setWarehouseStatus('ACTIVE');
+      loadTabContent();
+    } catch (err) {
+      addToast(err.message || 'Warehouse creation failed', 'error');
     }
   };
 
@@ -204,6 +271,37 @@ export default function AdminPortal({ user, addToast }) {
     }
   };
 
+  const handleCommissionRateCreate = async (e) => {
+    e.preventDefault();
+    if (!rateCategory || !rateValue) {
+      addToast('Please select a category and specify a rate.', 'error');
+      return;
+    }
+    try {
+      await api.categories.createCommissionRate({
+        categoryId: rateCategory,
+        commissionRate: Number(rateValue),
+        effectiveFrom: new Date().toISOString(),
+      });
+      addToast('Category commission rate registered successfully!', 'success');
+      setRateCategory('');
+      setRateValue('');
+      loadTabContent();
+    } catch (err) {
+      addToast(err.message || 'Failed to save commission rate', 'error');
+    }
+  };
+
+  const handleToggleRateStatus = async (rateId) => {
+    try {
+      await api.categories.toggleCommissionRateStatus(rateId);
+      addToast('Commission rate status updated.', 'success');
+      loadTabContent();
+    } catch (err) {
+      addToast(err.message || 'Status toggle failed', 'error');
+    }
+  };
+
   return (
     <div className="dashboard-container">
       {/* Admin Sidebar Navigation */}
@@ -221,6 +319,9 @@ export default function AdminPortal({ user, addToast }) {
         <button className={`sidebar-link ${activeTab === 'categories' ? 'active' : ''}`} onClick={() => setActiveTab('categories')}>
           📂 Category Taxonomy
         </button>
+        <button className={`sidebar-link ${activeTab === 'commissionRates' ? 'active' : ''}`} onClick={() => setActiveTab('commissionRates')}>
+          💰 Category Commissions
+        </button>
         <button className={`sidebar-link ${activeTab === 'coupons' ? 'active' : ''}`} onClick={() => setActiveTab('coupons')}>
           🎟️ Coupon Management
         </button>
@@ -230,6 +331,12 @@ export default function AdminPortal({ user, addToast }) {
 <button className={`sidebar-link ${activeTab === 'systemLogs' ? 'active' : ''}`} onClick={() => setActiveTab('systemLogs')}>
   🗒️ System Logs
 </button>
+        <button className={`sidebar-link ${activeTab === 'warehouses' ? 'active' : ''}`} onClick={() => setActiveTab('warehouses')}>
+          🏭 Warehouse Management
+        </button>
+        <button className={`sidebar-link ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>
+          📋 Order & Refund Control
+        </button>
         <button className={`sidebar-link ${activeTab === 'staff' ? 'active' : ''}`} onClick={() => setActiveTab('staff')}>
           🛡️ Provision Accounts
         </button>
@@ -396,8 +503,8 @@ export default function AdminPortal({ user, addToast }) {
           /* CATEGORY taxonomy */
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700 }}>Taxonomy Taxonomy (Categories)</h3>
-              <button className="btn btn-primary" onClick={() => { setCatName(''); setCatDesc(''); setEditingCategory(null); setShowCategoryForm(true); }}>
+              <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700 }}>Category Taxonomy</h3>
+              <button className="btn btn-primary" onClick={() => { setCatName(''); setCatDesc(''); setCatActive(true); setCatActive(true); setEditingCategory(null); setShowCategoryForm(true); }}>
                 + Create Category
               </button>
             </div>
@@ -417,6 +524,17 @@ export default function AdminPortal({ user, addToast }) {
                     <div className="form-group">
                       <label className="form-label">Description</label>
                       <textarea className="form-input" placeholder="Enter sub-classification details..." value={catDesc} onChange={(e) => setCatDesc(e.target.value)} rows="3"></textarea>
+                    </div>
+                    <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <input
+                        id="category-active"
+                        type="checkbox"
+                        checked={catActive}
+                        onChange={(e) => setCatActive(e.target.checked)}
+                      />
+                      <label htmlFor="category-active" className="form-label" style={{ margin: 0 }}>
+                        Active category
+                      </label>
                     </div>
                     <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
                       {editingCategory ? 'Update Category' : 'Save Category'}
@@ -505,6 +623,61 @@ export default function AdminPortal({ user, addToast }) {
           </div>
         )}
 
+        {activeTab === 'warehouses' && (
+          <div>
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, marginBottom: '1rem' }}>Warehouse Creation</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1.2rem' }}>Create fulfillment hubs that warehouse staff can manage from their portal.</p>
+
+            <form className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.5rem', display: 'grid', gap: '0.8rem' }} onSubmit={handleWarehouseCreate}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.8rem' }}>
+                <input className="form-input" placeholder="Warehouse Code" value={warehouseCode} onChange={(e) => setWarehouseCode(e.target.value)} />
+                <input className="form-input" placeholder="Warehouse Name" value={warehouseName} onChange={(e) => setWarehouseName(e.target.value)} />
+                <input className="form-input" placeholder="Address" value={warehouseAddress} onChange={(e) => setWarehouseAddress(e.target.value)} />
+                <input className="form-input" placeholder="City" value={warehouseCity} onChange={(e) => setWarehouseCity(e.target.value)} />
+                <input className="form-input" placeholder="State" value={warehouseState} onChange={(e) => setWarehouseState(e.target.value)} />
+                <input className="form-input" placeholder="ZIP" value={warehouseZip} onChange={(e) => setWarehouseZip(e.target.value)} />
+                <input className="form-input" placeholder="Country" value={warehouseCountry} onChange={(e) => setWarehouseCountry(e.target.value)} />
+                <input className="form-input" type="number" min="1" placeholder="Capacity" value={warehouseCapacity} onChange={(e) => setWarehouseCapacity(e.target.value)} />
+                <select className="form-input" value={warehouseStatus} onChange={(e) => setWarehouseStatus(e.target.value)}>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </div>
+              <button className="btn btn-primary" type="submit">Create Warehouse</button>
+            </form>
+
+            <h4 style={{ marginBottom: '0.8rem' }}>Existing Warehouses</h4>
+            {warehouses.length === 0 ? (
+              <div className="glass-card" style={{ padding: '1.5rem', color: 'var(--text-muted)' }}>No warehouses created yet.</div>
+            ) : (
+              <div className="table-container">
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Name</th>
+                      <th>City</th>
+                      <th>Capacity</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {warehouses.map((warehouse) => (
+                      <tr key={warehouse.id}>
+                        <td>{warehouse.code}</td>
+                        <td>{warehouse.name}</td>
+                        <td>{warehouse.city}</td>
+                        <td>{warehouse.capacity}</td>
+                        <td>{warehouse.status || 'ACTIVE'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'customers' && (
           /* CUSTOMERS DIRECTORY */
           <div>
@@ -545,9 +718,138 @@ export default function AdminPortal({ user, addToast }) {
           </div>
         )}
 
+        {/* Render Orders Control Tab */}
+        {activeTab === 'orders' && (
+          <div>
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, marginBottom: '1.5rem' }}>Enterprise Order Control Dashboard</h3>
+            
+            <div style={{ maxWidth: '800px' }}>
+              <h4 style={{ fontWeight: 600, marginBottom: '1rem', color: 'var(--primary)' }}>Active System Orders ({adminOrders.length})</h4>
+              <div style={{ maxHeight: '600px', overflowY: 'auto', display: 'grid', gap: '1rem' }}>
+                {adminOrders.map(o => (
+                  <div key={o.id} className="glass-card" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                      <strong style={{ fontSize: '1.1rem' }}>Order #{o.id.substring(0, 8)}...</strong>
+                      <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', padding: '0.25rem 0.5rem' }}>{o.status}</span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                      <p>Total Amount: ₹{o.totalAmount || o.total}</p>
+                      <p>Customer: {o.user?.fullName || 'Guest'} ({o.user?.email || 'N/A'})</p>
+                      <p>Date: {new Date(o.createdAt).toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))}
+                {adminOrders.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No orders in the system.</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Render Reports Tab */}
         {activeTab === 'reports' && (
           <ReportDashboard addToast={addToast} />
+        )}
+
+        {activeTab === 'commissionRates' && (
+          <div>
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, marginBottom: '1.5rem' }}>Category Commission Rate Overrides</h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '2rem', alignItems: 'start' }}>
+              {/* Form to add rate override */}
+              <div className="glass-card" style={{ padding: '1.5rem' }}>
+                <h4 style={{ fontWeight: 600, marginBottom: '1rem', color: 'var(--primary)' }}>Add Category Commission Override</h4>
+                <form onSubmit={handleCommissionRateCreate}>
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="form-label">Category *</label>
+                    <select
+                      className="form-input"
+                      style={{ width: '100%', padding: '0.5rem', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: '6px' }}
+                      value={rateCategory}
+                      onChange={(e) => setRateCategory(e.target.value)}
+                      required
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.categoryName}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="form-label">Commission Override Rate (%) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      className="form-input"
+                      placeholder="e.g. 8.5"
+                      value={rateValue}
+                      onChange={(e) => setRateValue(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
+                    Save Override Rate
+                  </button>
+                </form>
+              </div>
+
+              {/* Table of active and historical rates */}
+              <div className="glass-card" style={{ padding: '1.5rem' }}>
+                <h4 style={{ fontWeight: 600, marginBottom: '1rem' }}>Registered Commission Overrides</h4>
+                <div className="table-container">
+                  <table className="custom-table" style={{ fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        <th>Override Rate</th>
+                        <th>Status</th>
+                        <th>Effective From</th>
+                        <th>Effective To</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {commissionRates.map(r => (
+                        <tr key={r.id}>
+                          <td><strong>{r.categoryName}</strong></td>
+                          <td style={{ fontWeight: 600 }}>{r.commissionRate}%</td>
+                          <td>
+                            <span className="badge" style={{
+                              background: r.active ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                              color: r.active ? '#10b981' : '#ef4444'
+                            }}>
+                              {r.active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td>{r.effectiveFrom ? new Date(r.effectiveFrom).toLocaleDateString() : 'N/A'}</td>
+                          <td>{r.effectiveTo ? new Date(r.effectiveTo).toLocaleDateString() : 'Present'}</td>
+                          <td>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }}
+                              onClick={() => handleToggleRateStatus(r.id)}
+                            >
+                              Toggle Status
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {commissionRates.length === 0 && (
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No category overrides configured.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
         {/* Render System Logs Tab */}
         {activeTab === 'systemLogs' && (

@@ -3,10 +3,15 @@ import { api } from '../api';
 import AvailabilityBadge from './AvailabilityBadge';
 import OrderList from './OrderList';
 import CouponManagementPage from './CouponManagementPage';
+import VendorEarningsAnalytics from './VendorEarningsAnalytics';
 
 export default function VendorPortal({ user, addToast }) {
   const [vendorProfile, setVendorProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Returns states
+  const [vendorReturns, setVendorReturns] = useState([]);
+  const [returnsLoading, setReturnsLoading] = useState(false);
   
   // Tabs
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'products', 'profile'
@@ -64,6 +69,34 @@ const [discountDrafts, setDiscountDrafts] = useState({});
   useEffect(() => {
     loadVendorProfile();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'returns') {
+      loadReturns();
+    }
+  }, [activeTab]);
+
+  const loadReturns = async () => {
+    setReturnsLoading(true);
+    try {
+      const res = await api.orders.adminGetReturns();
+      setVendorReturns(res.data || res || []);
+    } catch (err) {
+      addToast(err.message || 'Failed to fetch return requests', 'error');
+    } finally {
+      setReturnsLoading(false);
+    }
+  };
+
+  const handleUpdateReturnStatus = async (returnId, nextStatus, successMsg) => {
+    try {
+      await api.orders.adminUpdateReturnStatus(returnId, nextStatus);
+      addToast(successMsg, 'success');
+      loadReturns();
+    } catch (err) {
+      addToast(err.message || 'Failed to update return status', 'error');
+    }
+  };
 
   const loadVendorProfile = async () => {
     setLoading(true);
@@ -152,41 +185,56 @@ const [discountDrafts, setDiscountDrafts] = useState({});
       return;
     }
 
-    try{
-
-    const formData = new FormData();
-
-      formData.append("productName", prodName);
-      formData.append("brand", prodBrand);
-      formData.append("description", prodDesc);
-      formData.append("features", prodFeatures);
-      formData.append("price", parseFloat(prodPrice));
-      formData.append("stockQuantity", parseInt(prodStock));
-      formData.append("categoryId", prodCategory);
-      formData.append("featured", prodFeatured);
+    try {
+      const formData = new FormData();
+      formData.append('productName', prodName);
+      formData.append('brand', prodBrand || '');
+      formData.append('description', prodDesc || '');
+      formData.append('features', prodFeatures || '');
+      formData.append('price', String(parseFloat(prodPrice)));
+      formData.append('stockQuantity', String(parseInt(prodStock, 10)));
+      formData.append('categoryId', prodCategory);
+      formData.append('featured', String(Boolean(prodFeatured)));
+      formData.append('active', String(Boolean(prodActive)));
 
       if (prodImage) {
-          formData.append("image", prodImage);
+        formData.append('image', prodImage, prodImage.name || 'product-image');
       }
 
+      let savedProduct;
       if (editingProduct) {
-        // Edit existing product
-        formData.append("active", prodActive);
-        await api.products.update(editingProduct.id, formData);
+        savedProduct = await api.products.update(editingProduct.id, formData);
         addToast('Product updated successfully!', 'success');
       } else {
-        // Create product
-        await api.products.create(formData);
+        savedProduct = await api.products.create(formData);
         addToast('Product submitted for approval!', 'success');
       }
+
+      const nextProduct = savedProduct || {};
+      const normalized = {
+        ...nextProduct,
+        id: nextProduct.id || editingProduct?.id,
+        imageUrl: nextProduct.imageUrl || nextProduct.image || imagePreview || editingProduct?.imageUrl || '',
+        productName: nextProduct.productName || prodName,
+        brand: nextProduct.brand || prodBrand,
+        description: nextProduct.description || prodDesc,
+        price: nextProduct.price ?? parseFloat(prodPrice),
+        stockQuantity: nextProduct.stockQuantity ?? parseInt(prodStock, 10),
+        categoryId: nextProduct.categoryId || prodCategory,
+        featured: nextProduct.featured ?? prodFeatured,
+        active: nextProduct.active ?? prodActive,
+      };
+
+      setMyProducts(prev => {
+        if (editingProduct) {
+          return prev.map(item => item.id === normalized.id ? { ...item, ...normalized } : item);
+        }
+        return [normalized, ...prev];
+      });
 
       setShowProductForm(false);
       setEditingProduct(null);
       resetProductForm();
-      
-      // Reload products
-      const prods = await api.products.getMyProducts();
-      setMyProducts(prods || []);
     } catch (err) {
       addToast(err.message || 'Failed to submit product', 'error');
     }
@@ -218,6 +266,8 @@ const [discountDrafts, setDiscountDrafts] = useState({});
     setProdCategory(prod.categoryId || '');
     setProdFeatured(prod.featured || false);
     setProdActive(prod.active || false);
+    setImagePreview(prod.imageUrl || '');
+    setProdImage(null);
     setShowProductForm(true);
   };
 
@@ -481,11 +531,17 @@ const [discountDrafts, setDiscountDrafts] = useState({});
         <button className={`btn ${activeTab === 'products' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('products')}>
           📦 Manage Products
         </button>
+        <button className={`btn ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('analytics')}>
+          📈 Earnings Analytics
+        </button>
         <button className={`btn ${activeTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('orders')}>
           🛒 Customer Orders
         </button>
         <button className={`btn ${activeTab === 'coupons' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('coupons')}>
           🎟️ Coupons
+        </button>
+        <button className={`btn ${activeTab === 'returns' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('returns')}>
+          🔄 Returns & Refunds
         </button>
         <button className={`btn ${activeTab === 'profile' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('profile')}>
           💼 Business Profile
@@ -902,6 +958,12 @@ const [discountDrafts, setDiscountDrafts] = useState({});
         </div>
       )}
 
+      {activeTab === 'analytics' && (
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <VendorEarningsAnalytics vendorId={vendorProfile?.vendorId} />
+        </div>
+      )}
+
       {activeTab === 'orders' && (
         <div>
           <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, marginBottom: '1.5rem' }}>Customer Orders Management</h3>
@@ -912,6 +974,99 @@ const [discountDrafts, setDiscountDrafts] = useState({});
       {activeTab === 'coupons' && (
         <div>
           <CouponManagementPage addToast={addToast} />
+        </div>
+      )}
+
+      {activeTab === 'returns' && (
+        <div>
+          <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, marginBottom: '1.5rem' }}>Returns &amp; Refunds Management</h3>
+          
+          {returnsLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+              <div className="spinner"></div>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Return Request ID</th>
+                    <th>Reason</th>
+                    <th>Refund Type</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendorReturns.map(ret => (
+                    <tr key={ret.id}>
+                      <td><strong>{ret.id.substring(0, 8)}...</strong></td>
+                      <td>{ret.reason}</td>
+                      <td>{ret.refundType}</td>
+                      <td>{ret.notes || 'No remarks'}</td>
+                      <td>
+                        <span className="badge" style={{
+                          background: ret.status === 'REFUND_COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                          color: ret.status === 'REFUND_COMPLETED' ? '#10b981' : '#f59e0b'
+                        }}>
+                          {ret.status}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {ret.status === 'RETURN_REQUESTED' && (
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#10b981', borderColor: '#10b981' }}
+                              onClick={() => handleUpdateReturnStatus(ret.id, 'RETURN_APPROVED', 'Return approved. Pickup scheduled.')}
+                            >
+                              Approve Return
+                            </button>
+                          )}
+                          {ret.status === 'RETURN_APPROVED' && (
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => handleUpdateReturnStatus(ret.id, 'RETURN_PICKED', 'Marked return package as picked up.')}
+                            >
+                              Mark Picked Up
+                            </button>
+                          )}
+                          {ret.status === 'RETURN_RECEIVED' && (
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => handleUpdateReturnStatus(ret.id, 'REFUND_INITIATED', 'Refund payment transaction initiated.')}
+                            >
+                              Initiate Refund
+                            </button>
+                          )}
+                          {ret.status === 'REFUND_INITIATED' && (
+                            <button
+                              className="btn btn-success"
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => handleUpdateReturnStatus(ret.id, 'REFUND_COMPLETED', 'Refund completed successfully.')}
+                            >
+                              Complete Refund
+                            </button>
+                          )}
+                          {['RETURN_PICKED', 'REFUND_COMPLETED'].includes(ret.status) && (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No Action Required</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {vendorReturns.length === 0 && (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No return requests found for your products.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

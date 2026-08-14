@@ -51,6 +51,19 @@ public class ProductController {
         return productService.updateProduct(id, request, vendor.getVendorId());
     }
 
+    @PutMapping(value="/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasAnyRole('VENDOR', 'ADMIN')")
+    public ProductResponse updateProductJson(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateProductRequest request) {
+
+        if (securityUtil.isCurrentUserAdmin()) {
+            return productService.updateProduct(id, request);
+        }
+        Vendor vendor = securityUtil.getCurrentVendor();
+        return productService.updateProduct(id, request, vendor.getVendorId());
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('VENDOR', 'ADMIN')")
     public void deleteProduct(@PathVariable UUID id) {

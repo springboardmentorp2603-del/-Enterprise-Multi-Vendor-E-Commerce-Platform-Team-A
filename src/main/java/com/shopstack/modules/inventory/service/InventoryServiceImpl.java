@@ -32,6 +32,8 @@ public class InventoryServiceImpl implements InventoryService {
     private final StockMovementRepository stockMovementRepository;
     private final ProductRepository productRepository;
     private final InventoryMapper inventoryMapper;
+    private final com.shopstack.modules.notification.service.NotificationService notificationService;
+    private final com.shopstack.modules.vendor.repository.VendorRepository vendorRepository;
 
     // ---------------------------------------------------------------
     // Reads
@@ -165,6 +167,29 @@ public class InventoryServiceImpl implements InventoryService {
         logMovement(inventory, MovementType.RESERVATION, -quantity,
                 previousAvailable, inventory.getAvailableStock(), orderId, performedBy,
                 "Reserved at checkout");
+
+         // Check for Low Stock Alert
+        if (inventory.isLowStock()) {
+            try {
+                UUID vendorUserId = null;
+                var vendorOpt = vendorRepository.findById(inventory.getVendorId());
+                if (vendorOpt.isPresent() && vendorOpt.get().getUser() != null) {
+                    vendorUserId = vendorOpt.get().getUser().getId();
+                }
+                if (vendorUserId != null) {
+                    notificationService.sendNotification(
+                        com.shopstack.modules.notification.dto.SendNotificationRequest.builder()
+                            .recipientId(vendorUserId)
+                            .recipientType("VENDOR")
+                            .type(com.shopstack.modules.notification.entity.NotificationType.VENDOR_ALERT)
+                            .channel(com.shopstack.modules.notification.entity.NotificationChannel.IN_APP)
+                            .title("Low Stock Alert")
+                            .message("Product '" + inventory.getProduct().getProductName() + "' has low stock: only " + inventory.getAvailableStock() + " left.")
+                            .build()
+                    );
+                }
+            } catch (Exception ignored) {}
+        }
     }
 
     @Override
@@ -214,6 +239,13 @@ public class InventoryServiceImpl implements InventoryService {
             inventory.setAvailableStock(previousAvailable + qty);
             saveWithLockCheck(inventory);
 
+            // Sync Product catalog stock quantity as well
+            try {
+                Product prod = inventory.getProduct();
+                prod.setStockQuantity((prod.getStockQuantity() != null ? prod.getStockQuantity() : 0) + qty);
+                productRepository.save(prod);
+            } catch (Exception ignored) {}
+
             logMovement(inventory, MovementType.RELEASE, qty,
                     previousAvailable, inventory.getAvailableStock(), orderId, performedBy,
                     "Released on payment failure/cancellation");
@@ -258,8 +290,19 @@ public class InventoryServiceImpl implements InventoryService {
 
     private Inventory findInventoryOrThrow(UUID productId) {
         return inventoryRepository.findByProduct_Id(productId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Inventory not found for product " + productId));
+                .orElseGet(() -> {
+                    Product product = productRepository.findById(productId).orElse(null);
+                    if (product != null) {
+                        Inventory inv = new Inventory();
+                        inv.setProduct(product);
+                        inv.setAvailableStock(product.getStockQuantity() != null ? product.getStockQuantity() : 0);
+                        inv.setReservedStock(0);
+                        inv.setReorderThreshold(10);
+                        inv.setVendorId(product.getVendorId());
+                        return inventoryRepository.save(inv);
+                    }
+                    throw new ResourceNotFoundException("Inventory not found for product " + productId);
+                });
     }
 
     private void verifyOwnership(Inventory inventory, Long vendorId) {

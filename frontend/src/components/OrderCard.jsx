@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { api } from '../api';
 import { Eye, RotateCcw, XCircle, Calendar, MapPin } from 'lucide-react';
 import ProductImage from './ProductImage';
 import StatusBadge from './StatusBadge';
 import InvoiceButton from './InvoiceButton';
+import ReturnRefundModal from './ReturnRefundModal';
 
 const vendorStatuses = [
   'PENDING',
@@ -12,7 +14,8 @@ const vendorStatuses = [
   'OUT_FOR_DELIVERY',
   'DELIVERED',
   'CANCELLED',
-  'RETURNED'
+  'RETURNED',
+  'REFUNDED'
 ];
 
 export default function OrderCard({
@@ -22,8 +25,11 @@ export default function OrderCard({
   onOpenDetails,
   onCancel,
   onReturn,
-  onReorder
+  onReorder,
+  addToast
 }) {
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [allocating, setAllocating] = useState(false);
   const orderId = order.orderId || order.id;
 
   const normalizedStatus = String(
@@ -326,45 +332,179 @@ export default function OrderCard({
 
             {normalizedStatus === 'DELIVERED' && (
               <button
-                className="btn btn-secondary"
-                onClick={() => onReturn(order)}
+                className="btn btn-return"
+                onClick={() => setShowReturnModal(true)}
                 style={{
-                  padding: '0.35rem 0.65rem',
-                  fontSize: '0.8rem'
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
                 }}
               >
-                Return
+                ↩ Return / Refund
               </button>
+            )}
+
+            {showReturnModal && (
+              <ReturnRefundModal
+                order={order}
+                addToast={addToast}
+                onClose={() => setShowReturnModal(false)}
+              />
             )}
           </>
         )}
 
         {isVendor && (
-          <select
-            value={
-              vendorStatuses.includes(normalizedStatus)
-                ? normalizedStatus
-                : 'PENDING'
-            }
-            onChange={(event) =>
-              onStatusChange(orderId, event.target.value)
-            }
-            style={{
-              marginLeft: 'auto',
-              background: 'var(--input-bg)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '6px',
-              padding: '0.35rem',
-              cursor: 'pointer'
-            }}
-          >
-            {vendorStatuses.map((status) => (
-              <option key={status} value={status}>
-                {status.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', width: '100%', marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+            
+            {/* Status indicator */}
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+              Status: {String(normalizedStatus).replace(/_/g, ' ')}
+            </span>
+
+            {/* Accept / Reject */}
+            {['PENDING', 'PAYMENT_SUCCESS', 'PAYMENT_PENDING'].includes(normalizedStatus) && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: '#10b981', borderColor: '#10b981' }}
+                  onClick={async () => {
+                    try {
+                      await api.orders.accept(orderId);
+                      addToast?.('Order accepted successfully.', 'success');
+                      onStatusChange?.(orderId, 'CONFIRMED');
+                    } catch (err) {
+                      addToast?.(err.message || 'Failed to accept order', 'error');
+                    }
+                  }}
+                >
+                  Accept Order
+                </button>
+                <button
+                  className="btn btn-danger"
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                  onClick={async () => {
+                    try {
+                      await api.orders.reject(orderId);
+                      addToast?.('Order rejected successfully.', 'success');
+                      onStatusChange?.(orderId, 'CANCELLED');
+                    } catch (err) {
+                      addToast?.(err.message || 'Failed to reject order', 'error');
+                    }
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+
+            {/* Pack */}
+            {normalizedStatus === 'CONFIRMED' && (
+              <button
+                className="btn btn-primary"
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', marginLeft: 'auto' }}
+                onClick={async () => {
+                  try {
+                    await api.orders.pack(orderId);
+                    addToast?.('Order packed successfully.', 'success');
+                    onStatusChange?.(orderId, 'PACKING');
+                  } catch (err) {
+                    addToast?.(err.message || 'Failed to pack order', 'error');
+                  }
+                }}
+              >
+                Pack Product
+              </button>
+            )}
+
+            {/* Ready for Pickup */}
+            {normalizedStatus === 'PACKING' && (
+              <button
+                className="btn btn-primary"
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', marginLeft: 'auto' }}
+                onClick={async () => {
+                  try {
+                    await api.orders.readyPickup(orderId);
+                    addToast?.('Order marked as ready for courier pickup.', 'success');
+                    onStatusChange?.(orderId, 'READY_FOR_PICKUP');
+                  } catch (err) {
+                    addToast?.(err.message || 'Failed to mark ready', 'error');
+                  }
+                }}
+              >
+                Ready for Pickup
+              </button>
+            )}
+
+            {/* Ready for Pickup actions: Slip & Allocate */}
+            {normalizedStatus === 'READY_FOR_PICKUP' && (
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                  onClick={async () => {
+                    try {
+                      const res = await api.orders.getPackingSlip(orderId);
+                      if (res && res.pdfPath) {
+                        window.open(`http://localhost:8080${res.pdfPath}`, '_blank');
+                      } else {
+                        addToast?.('Failed to get packing slip path', 'error');
+                      }
+                    } catch (err) {
+                      addToast?.(err.message || 'Failed to generate slip', 'error');
+                    }
+                  }}
+                >
+                  📄 Packing Slip
+                </button>
+                <button
+                  className="btn btn-primary"
+                  disabled={allocating}
+                  onClick={async () => {
+                    try {
+                      setAllocating(true);
+                      await api.warehouseFulfillments.allocateOrder(orderId);
+                      addToast?.('Order sent for warehouse allocation.', 'success');
+                      onStatusChange?.(orderId, 'PROCESSING');
+                    } catch (err) {
+                      addToast?.(err.message || 'Allocation failed', 'error');
+                    } finally {
+                      setAllocating(false);
+                    }
+                  }}
+                  style={{ padding: '0.35rem 0.75rem' }}
+                >
+                  {allocating ? 'Allocating...' : 'Allocate to Warehouse'}
+                </button>
+              </div>
+            )}
+
+            {/* Awaiting Vendor Allotment fallback (for backward compatibility) */}
+            {normalizedStatus === 'AWAITING_VENDOR_ALLOTMENT' && (
+              <button
+                className="btn btn-primary"
+                disabled={allocating}
+                onClick={async () => {
+                  try {
+                    setAllocating(true);
+                    await api.warehouseFulfillments.allocateOrder(orderId);
+                    addToast?.('Order sent for warehouse allocation.', 'success');
+                    onStatusChange?.(orderId, 'PROCESSING');
+                  } catch (err) {
+                    addToast?.(err.message || 'Allocation failed', 'error');
+                  } finally {
+                    setAllocating(false);
+                  }
+                }}
+                style={{ padding: '0.35rem 0.75rem', marginLeft: 'auto' }}
+              >
+                {allocating ? 'Allocating...' : 'Allocate to Warehouse'}
+              </button>
+            )}
+
+          </div>
         )}
 
       </div>

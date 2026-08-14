@@ -12,6 +12,8 @@ import { PRODUCTS_DATA } from './data/products';
 import ProductImage from './components/ProductImage';
 import CheckoutPortal from './components/CheckoutPortal';
 import InventoryManagementPage from './components/InventoryManagementPage';
+import ReturnRefundPage from './components/ReturnRefundPage';
+import WarehousePortal from './components/WarehousePortal';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -43,6 +45,13 @@ export default function App() {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
+  const getDefaultViewForRole = (role) => {
+  if (role === 'ADMIN') return 'admin';
+  if (role === 'VENDOR') return 'vendor';
+  if (role === 'WAREHOUSE_STAFF') return 'warehouse';
+  return 'shop';
+};
+
   // Load user session on startup
   useEffect(() => {
     const initSession = async () => {
@@ -52,14 +61,7 @@ export default function App() {
           const fetchedUser = await api.auth.me();
           setUser(fetchedUser);
           // Send user to appropriate view by default
-          if (fetchedUser.role === 'ADMIN') {
-            setCurrentView('admin');
-          } else if (fetchedUser.role === 'VENDOR') {
-            setCurrentView('vendor');
-          } else {
-            // Logged-in customers go to shop
-            setCurrentView('shop');
-          }
+          setCurrentView(getDefaultViewForRole(fetchedUser.role));
         } catch (err) {
           console.error('Session restoration failed', err);
           tokenStorage.clearToken();
@@ -175,14 +177,8 @@ export default function App() {
   };
 
   const handleAuthSuccess = (loggedInUser) => {
-    setUser(loggedInUser);
-    if (loggedInUser.role === 'ADMIN') {
-      setCurrentView('admin');
-    } else if (loggedInUser.role === 'VENDOR') {
-      setCurrentView('vendor');
-    } else {
-      setCurrentView('shop');
-    }
+      setUser(loggedInUser);
+      setCurrentView(getDefaultViewForRole(loggedInUser.role));
   };
 
   const handleCheckout = () => {
@@ -313,7 +309,7 @@ export default function App() {
       {/* Dynamic Navigation Header */}
       { currentView != 'wishlist' && (
       <header className="app-header">
-        <div className="logo-container" onClick={() => setCurrentView(user ? 'shop' : 'landing')}>
+        <div className="logo-container" onClick={() => setCurrentView(user ? getDefaultViewForRole(user.role) : 'landing')}>
           <span className="logo-icon">🛍️</span>
           <span className="logo-text">ShopStack</span>
         </div>
@@ -339,6 +335,16 @@ export default function App() {
               Merchant Panel
             </button>
           )}
+
+          {user && user.role === 'WAREHOUSE_STAFF' && (
+            <button
+              className={`nav-link ${currentView === 'warehouse' ? 'active' : ''}`}
+              onClick={() => setCurrentView('warehouse')}
+              style={{ background: 'transparent', border: 'none', font: 'inherit' }}
+            >
+              Warehouse Workflow
+            </button>
+          )}  
           {user && user.role === 'VENDOR' && (
             <button
               className={`nav-link ${currentView === 'inventory' ? 'active' : ''}`}
@@ -356,6 +362,16 @@ export default function App() {
               style={{ background: 'transparent', border: 'none', font: 'inherit' }}
             >
               My Orders
+            </button>
+          )}
+           {/* Customer Returns & Refunds */}
+          {user && user.role === 'CUSTOMER' && (
+            <button
+              className={`nav-link ${currentView === 'returns' ? 'active' : ''}`}
+              onClick={() => setCurrentView('returns')}
+              style={{ background: 'transparent', border: 'none', font: 'inherit' }}
+            >
+              Returns
             </button>
           )}
           {/* Vendor Orders */}
@@ -445,6 +461,12 @@ export default function App() {
           </div>
         )}
 
+        {currentView === 'warehouse' && user && user.role === 'WAREHOUSE_STAFF' && (
+          <div className="main-content">
+            <WarehousePortal user={user} addToast={addToast} />
+          </div>
+        )}
+
         {currentView === 'admin' && user && user.role === 'ADMIN' && (
           <AdminPortal user={user} addToast={addToast} />
         )}
@@ -465,6 +487,14 @@ export default function App() {
           <div className="main-content">
             <OrderList isVendor={false} addToast={addToast} user={user} />
           </div>
+        )}
+
+        {currentView === 'returns' && user && user.role === 'CUSTOMER' && (
+          <ReturnRefundPage
+            user={user}
+            addToast={addToast}
+            onBack={() => setCurrentView('orders')}
+          />
         )}
 
         {currentView === 'vendorOrders' && user && user.role === 'VENDOR' && (

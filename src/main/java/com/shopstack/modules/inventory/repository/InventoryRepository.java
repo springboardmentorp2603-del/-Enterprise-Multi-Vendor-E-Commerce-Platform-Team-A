@@ -15,6 +15,8 @@ public interface InventoryRepository extends JpaRepository<Inventory, UUID> {
 
     List<Inventory> findByVendorId(Long vendorId);
 
+     List<Inventory> findByWarehouseId(UUID warehouseId);
+
     // Derived query methods can't compare two columns on the same row
     // (available_stock <= reorder_threshold), so this needs JPQL.
     @Query("select i from Inventory i where i.vendorId = :vendorId " +

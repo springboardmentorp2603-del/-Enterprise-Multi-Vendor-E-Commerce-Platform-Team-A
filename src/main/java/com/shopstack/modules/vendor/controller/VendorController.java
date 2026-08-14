@@ -6,6 +6,8 @@ import com.shopstack.modules.vendor.dto.requests.*;
 import com.shopstack.modules.vendor.dto.responses.VendorApprovalLogResponse;
 import com.shopstack.modules.vendor.dto.responses.VendorResponse;
 import com.shopstack.modules.vendor.service.VendorService;
+import com.shopstack.modules.report.dto.responses.VendorEarningsAnalyticsResponse;
+import com.shopstack.modules.report.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,6 +27,7 @@ public class VendorController {
 
     private final VendorService vendorService;
     private final SecurityUtil securityUtil;
+    private final ReportService reportService;
 
     // ---- Registration & profile ----
 
@@ -52,6 +55,14 @@ public class VendorController {
     @PreAuthorize("hasAnyRole('VENDOR', 'ADMIN')")
     public ResponseEntity<VendorResponse> getVendorByUserId(@PathVariable UUID userId) {
         return ResponseEntity.ok(vendorService.getVendorByUserId(userId));
+    }
+
+    @GetMapping("/{vendorId}/earnings")
+    @PreAuthorize("hasAnyRole('VENDOR', 'ADMIN')")
+    public ResponseEntity<VendorEarningsAnalyticsResponse> getVendorEarnings(
+            @PathVariable Long vendorId,
+            @RequestParam(defaultValue = "30d") String range) {
+        return ResponseEntity.ok(reportService.getVendorEarningsAnalytics(vendorId, range));
     }
 
     // Full vendor directory (incl. PENDING/SUSPENDED/etc.) is admin-only.

@@ -14,6 +14,8 @@ import java.util.List;
 public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByUserId(UUID userId);
 
+    List<Order> findByUserIdAndStatusIn(UUID userId, List<String> statuses);
+
     long countByStatus(String status);
 
     @Query("SELECT o FROM Order o WHERE o.createdAt BETWEEN :from AND :to ORDER BY o.createdAt DESC")
@@ -21,4 +23,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status <> 'CANCELLED'")
     Double sumTotalRevenue();
+
+    @Query("SELECT DISTINCT o FROM Order o JOIN o.items i JOIN i.product p WHERE p.vendorId = :vendorId ORDER BY o.createdAt DESC")
+    List<Order> findByVendorId(@Param("vendorId") Long vendorId);
 }

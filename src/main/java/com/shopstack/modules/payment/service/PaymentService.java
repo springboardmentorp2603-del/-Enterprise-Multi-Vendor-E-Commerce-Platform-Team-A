@@ -18,11 +18,23 @@ public class PaymentService {
     @Autowired
     private OrderRepository orderRepository;
 
+     @Autowired
+    private com.shopstack.modules.order.service.CommissionService commissionService;
+
     @Autowired
     private RazorpayService razorpayService;
 
     @Autowired
     private InvoiceService invoiceService;
+
+    @Autowired
+    private com.shopstack.modules.inventory.service.InventoryService inventoryService;
+
+    @Autowired
+    private com.shopstack.modules.notification.service.NotificationService notificationService;
+
+    @Autowired
+    private com.shopstack.modules.systemlog.service.SystemLogService systemLogService;
 
     public Payment createPayment(UUID orderId, Double amount, String currency) throws Exception {
 
@@ -101,6 +113,28 @@ public class PaymentService {
                     if (order != null) {
                         order.setStatus("CONFIRMED");
                         orderRepository.save(order);
+                        commissionService.createCommissionLedger(order);
+
+                        // Commit reserved stock to final sale
+                        UUID customerId = order.getUser() != null ? order.getUser().getId() : null;
+                        inventoryService.commitStock(order.getId(), customerId);
+
+                        // Send success notifications
+                        try {
+                            notificationService.sendNotification(
+                                com.shopstack.modules.notification.dto.SendNotificationRequest.builder()
+                                    .recipientId(customerId != null ? customerId : UUID.randomUUID())
+                                    .recipientType("CUSTOMER")
+                                    .type(com.shopstack.modules.notification.entity.NotificationType.PAYMENT)
+                                    .channel(com.shopstack.modules.notification.entity.NotificationChannel.IN_APP)
+                                    .title("Payment Successful")
+                                    .message("We received your payment of Rs. " + payment.getAmount() + " for Order #" + order.getId() + ". Your order is now confirmed!")
+                                    .build()
+                            );
+                            } catch (Exception ignored) {}
+
+                        // Log payment success audit event
+                        systemLogService.log("PAYMENT", "Payment Success", customerId, order.getUser() != null ? order.getUser().getName() : "Customer", "INFO", "Payment success for Order: " + order.getId());
                     }
                 } catch (Exception ignored) {}
             }
@@ -120,8 +154,42 @@ public class PaymentService {
                     );
                 }
             } catch (Exception ignored) {}
-        } else {
+         } else {
             payment.setStatus("FAILED");
+            paymentRepository.save(payment);
+
+            // Online payment failure stock release and cancellation
+            if (payment.getOrderId() != null) {
+                try {
+                    Order order = orderRepository.findById(payment.getOrderId()).orElse(null);
+                    if (order != null) {
+                        order.setStatus("CANCELLED");
+                        orderRepository.save(order);
+                        commissionService.createRefundReversalForOrder(order.getId());
+
+                        UUID customerId = order.getUser() != null ? order.getUser().getId() : null;
+
+                        // Release stock
+                        inventoryService.releaseStock(order.getId(), customerId);
+
+                        // Send failure notification
+                        try {
+                            notificationService.sendNotification(
+                                com.shopstack.modules.notification.dto.SendNotificationRequest.builder()
+                                    .recipientId(customerId != null ? customerId : UUID.randomUUID())
+                                    .recipientType("CUSTOMER")
+                                    .type(com.shopstack.modules.notification.entity.NotificationType.PAYMENT)
+                                    .channel(com.shopstack.modules.notification.entity.NotificationChannel.IN_APP)
+                                    .title("Payment Failed")
+                                    .message("Payment failed for Order #" + order.getId() + ". Locked inventory has been released.")
+                                    .build()
+                            );
+                        } catch (Exception ignored) {}
+
+                        systemLogService.log("PAYMENT", "Payment Failed", customerId, order.getUser() != null ? order.getUser().getName() : "Customer", "INFO", "Payment failed for Order: " + order.getId());
+                    }
+                } catch (Exception ignored) {}
+            }
         }
 
         return paymentRepository.save(payment);

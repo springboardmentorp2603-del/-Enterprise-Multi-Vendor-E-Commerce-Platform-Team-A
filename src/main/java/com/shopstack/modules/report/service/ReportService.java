@@ -7,6 +7,7 @@ import com.shopstack.modules.order.repository.OrderRepository;
 import com.shopstack.modules.report.dto.responses.FinancialReportRow;
 import com.shopstack.modules.report.dto.responses.OrderReportRow;
 import com.shopstack.modules.report.dto.responses.SalesReportRow;
+import com.shopstack.modules.report.dto.responses.VendorEarningsAnalyticsResponse;
 import com.shopstack.modules.report.dto.responses.VendorReportRow;
 import com.shopstack.modules.vendor.entity.Vendor;
 import com.shopstack.modules.vendor.repository.VendorRepository;
@@ -22,7 +23,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import com.shopstack.modules.product.entity.Product;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,8 @@ public class ReportService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final VendorRepository vendorRepository;
+    private final com.shopstack.modules.order.repository.CommissionLedgerRepository commissionLedgerRepository;
+    private final com.shopstack.modules.product.repository.ProductRepository productRepository;
 
     public List<SalesReportRow> getSalesReport(LocalDate from, LocalDate to) {
         LocalDateTime start = from.atStartOfDay();
@@ -93,6 +98,122 @@ public class ReportService {
         }
         rows.sort(Comparator.comparing(VendorReportRow::getTotalRevenue).reversed());
         return rows;
+    }
+
+        public VendorEarningsAnalyticsResponse getVendorEarningsAnalytics(Long vendorId, String range) {
+        LocalDate to = LocalDate.now();
+        LocalDate from = switch (range == null ? "30d" : range) {
+            case "90d" -> to.minusDays(90);
+            case "1y" -> to.minusYears(1);
+            default -> to.minusDays(30);
+        };
+
+        LocalDateTime start = from.atStartOfDay();
+        LocalDateTime end = to.atTime(23, 59, 59);
+
+        List<com.shopstack.modules.order.entity.CommissionLedger> vendorLedger = commissionLedgerRepository.findAllByVendorIdAndRange(vendorId, start, end);
+
+        BigDecimal grossSales = vendorLedger.stream()
+                .filter(l -> l.getTransactionType() == com.shopstack.modules.order.enums.LedgerTransactionType.COMMISSION)
+                .map(com.shopstack.modules.order.entity.CommissionLedger::getGrossAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal platformCommission = vendorLedger.stream()
+                .filter(l -> l.getTransactionType() == com.shopstack.modules.order.enums.LedgerTransactionType.COMMISSION)
+                .map(com.shopstack.modules.order.entity.CommissionLedger::getCommissionAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal refundReversalAmount = vendorLedger.stream()
+                .filter(l -> l.getTransactionType() == com.shopstack.modules.order.enums.LedgerTransactionType.REFUND_REVERSAL)
+                .map(com.shopstack.modules.order.entity.CommissionLedger::getCommissionAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .abs()
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal netVendorEarnings = vendorLedger.stream()
+                .map(com.shopstack.modules.order.entity.CommissionLedger::getVendorAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        long completedOrderCount = vendorLedger.stream()
+                .map(com.shopstack.modules.order.entity.CommissionLedger::getOrderId)
+                .distinct()
+                .count();
+
+        BigDecimal avgOrderValue = completedOrderCount > 0
+                ? grossSales.divide(BigDecimal.valueOf(completedOrderCount), 2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        List<VendorEarningsAnalyticsResponse.TrendPoint> trend = new ArrayList<>();
+        int days = switch (range == null ? "30d" : range) {
+            case "90d" -> 90;
+            case "1y" -> 365;
+            default -> 30;
+        };
+        for (int i = days - 1; i >= 0; i--) {
+            LocalDate day = to.minusDays(i);
+            BigDecimal dayEarnings = vendorLedger.stream()
+                    .filter(l -> l.getCreatedAt() != null && l.getCreatedAt().toLocalDate().equals(day))
+                    .map(com.shopstack.modules.order.entity.CommissionLedger::getVendorAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
+            trend.add(VendorEarningsAnalyticsResponse.TrendPoint.builder()
+                    .label(day.getMonth().toString().substring(0, 3) + " " + day.getDayOfMonth())
+                    .earnings(dayEarnings)
+                    .build());
+        }
+
+        Map<UUID, BigDecimal> productRevenue = vendorLedger.stream()
+                .filter(l -> l.getTransactionType() == com.shopstack.modules.order.enums.LedgerTransactionType.COMMISSION)
+                .collect(Collectors.groupingBy(com.shopstack.modules.order.entity.CommissionLedger::getProductId,
+                        Collectors.mapping(com.shopstack.modules.order.entity.CommissionLedger::getGrossAmount, Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
+
+        List<UUID> orderItemIds = vendorLedger.stream()
+                .map(com.shopstack.modules.order.entity.CommissionLedger::getOrderItemId)
+                .toList();
+        List<OrderItem> orderItems = orderItemRepository.findAllById(orderItemIds);
+        Map<UUID, Integer> orderItemQtys = orderItems.stream()
+                .collect(Collectors.toMap(OrderItem::getId, OrderItem::getQuantity, (a, b) -> a));
+
+        List<VendorEarningsAnalyticsResponse.TopProductPoint> topProducts = productRevenue.entrySet().stream()
+                .map(entry -> {
+                    String name = "Product (" + entry.getKey().toString().substring(0, 8) + ")";
+                    try {
+                        Product prod = productRepository.findById(entry.getKey()).orElse(null);
+                        if (prod != null) {
+                            name = prod.getProductName();
+                        }
+                    } catch (Exception ignored) {}
+
+                    long unitsSold = vendorLedger.stream()
+                            .filter(l -> entry.getKey().equals(l.getProductId()) && l.getTransactionType() == com.shopstack.modules.order.enums.LedgerTransactionType.COMMISSION)
+                            .mapToLong(l -> orderItemQtys.getOrDefault(l.getOrderItemId(), 1))
+                            .sum();
+
+                    return VendorEarningsAnalyticsResponse.TopProductPoint.builder()
+                            .productName(name)
+                            .revenue(entry.getValue())
+                            .unitsSold(unitsSold)
+                            .build();
+                })
+                .sorted((a, b) -> b.getRevenue().compareTo(a.getRevenue()))
+                .limit(5)
+                .toList();
+
+        return VendorEarningsAnalyticsResponse.builder()
+                .totalEarnings(grossSales)
+                .netPayout(netVendorEarnings)
+                .avgOrderValue(avgOrderValue)
+                .totalOrders(completedOrderCount)
+                .trend(trend)
+                .topProducts(topProducts)
+                .grossSales(grossSales)
+                .platformCommission(platformCommission)
+                .refundReversalAmount(refundReversalAmount)
+                .netVendorEarnings(netVendorEarnings)
+                .build();
     }
 
     public List<OrderReportRow> getOrderReport(LocalDate from, LocalDate to, String statusFilter) {

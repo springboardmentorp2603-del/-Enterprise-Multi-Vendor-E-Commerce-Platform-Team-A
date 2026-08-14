@@ -22,14 +22,15 @@ export default function ProductTable({ products, onSelectStock, onSelectDiscount
       </thead>
       <tbody>
         {products.map((p) => {
-          const finalPrice = p.price - (p.price * p.discountPercent) / 100;
+          const discount = p.discountPercentage ?? p.discountPercent ?? 0;
+          const finalPrice = p.price - (p.price * discount) / 100;
           return (
             <tr key={p.id}>
               <td>{p.name}</td>
               <td className="mono">{p.sku}</td>
               <td>{p.stockQty}</td>
               <td>₹{p.price.toFixed(2)}</td>
-              <td>{p.discountPercent}%</td>
+              <td>{discount}%</td>
               <td>₹{finalPrice.toFixed(2)}</td>
               <td>
                 <AvailabilityBadge stockQty={p.stockQty} />

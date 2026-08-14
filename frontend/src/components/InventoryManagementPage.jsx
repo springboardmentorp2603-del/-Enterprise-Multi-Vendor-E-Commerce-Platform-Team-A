@@ -73,19 +73,19 @@ export default function InventoryManagementPage({ addToast }) {
   const handleDiscountSave = async (prod) => {
     const newDiscount = discountDrafts[prod.id];
     try {
-      const payload = buildUpdatePayload(prod, { discountPercent: newDiscount });
+      const payload = buildUpdatePayload(prod, { discountPercentage: newDiscount });
       await api.products.update(prod.id, payload);
       addToast('Discount updated!', 'success');
       const { [prod.id]: _discard, ...rest } = discountDrafts;
       setDiscountDrafts(rest);
       loadProducts();
     } catch (err) {
-      addToast(err.message || 'Failed to update discount (backend may not support this field yet)', 'error');
+      addToast(err.message || 'Failed to update discount', 'error');
     }
   };
 
   const getFinalPrice = (prod) => {
-    const discount = prod.discountPercent ?? 0;
+    const discount = prod.discountPercentage ?? prod.discountPercent ?? 0;
     return (prod.price - (prod.price * discount) / 100).toFixed(2);
   };
 

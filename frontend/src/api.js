@@ -40,6 +40,15 @@ async function apiRequest(endpoint, options = {}) {
     config.body = JSON.stringify(config.body);
   }
 
+  if (isFormData && config.body instanceof FormData && config.body.get('image') instanceof File) {
+    const file = config.body.get('image');
+    const ext = file.name?.split('.').pop()?.toLowerCase() || 'jpg';
+    const type = file.type || `image/${ext}`;
+    if (type && !file.type) {
+      file.type = type;
+    }
+  }
+
   try {
     const response = await fetch(`${BASE_URL}${endpoint}`, config);
     
@@ -128,6 +137,28 @@ export const api = {
       method: 'POST',
       body: docData,
     }),
+     getEarnings: (vendorId, range = '30d') => apiRequest(`/api/v1/vendors/${vendorId}/earnings?range=${range}`, {
+      method: 'GET',
+    }),
+    getCommissionLedger: (params) => {
+      let url = '/api/v1/vendors/commission/ledger';
+      const queryParts = [];
+      if (params) {
+        if (params.page !== undefined) queryParts.push(`page=${params.page}`);
+        if (params.size !== undefined) queryParts.push(`size=${params.size}`);
+        if (params.dateFrom) queryParts.push(`dateFrom=${params.dateFrom}`);
+        if (params.dateTo) queryParts.push(`dateTo=${params.dateTo}`);
+        if (params.transactionType) queryParts.push(`transactionType=${params.transactionType}`);
+        if (params.status) queryParts.push(`status=${params.status}`);
+        if (params.orderId) queryParts.push(`orderId=${params.orderId}`);
+        if (params.productId) queryParts.push(`productId=${params.productId}`);
+      }
+      if (queryParts.length > 0) {
+        url += '?' + queryParts.join('&');
+      }
+      return apiRequest(url, { method: 'GET' });
+    },
+    getCommissionSummary: () => apiRequest('/api/v1/vendors/commission/summary', { method: 'GET' }),
   },
 
   // --- PRODUCT & CATEGORY ENDPOINTS ---
@@ -163,6 +194,20 @@ export const api = {
   categories: {
     listAll: () => apiRequest('/api/categories', {
       method: 'GET',
+    }),
+    getCommissionRates: () => apiRequest('/api/v1/admin/categories/commission-rates', {
+      method: 'GET',
+    }),
+    createCommissionRate: (rateData) => apiRequest('/api/v1/admin/categories/commission-rates', {
+      method: 'POST',
+      body: rateData,
+    }),
+    updateCommissionRate: (id, rateData) => apiRequest(`/api/v1/admin/categories/commission-rates/${id}`, {
+      method: 'PUT',
+      body: rateData,
+    }),
+    toggleCommissionRateStatus: (id) => apiRequest(`/api/v1/admin/categories/commission-rates/${id}/status`, {
+      method: 'PATCH',
     }),
   },
 
@@ -238,6 +283,13 @@ export const api = {
       body: staffData,
     }),
     listCustomers: () => apiRequest('/admin/customers', {
+      method: 'GET',
+    }),
+    createWarehouse: (warehouseData) => apiRequest('/api/v1/warehouses', {
+      method: 'POST',
+      body: warehouseData,
+    }),
+    listWarehouses: () => apiRequest('/api/v1/warehouses', {
       method: 'GET',
     }),
     // --- NEW: Reports
@@ -331,12 +383,46 @@ export const api = {
     list: (userId) => apiRequest(`/api/v1/orders?userId=${userId}`, { method: 'GET' }),
     getAll: (userId) => apiRequest(`/api/v1/orders?userId=${userId}`, { method: 'GET' }),
     getVendorAll: () => apiRequest('/api/v1/orders/vendor', { method: 'GET' }),
+    getReturns: () => apiRequest('/api/v1/orders/returns', { method: 'GET' }),
     getById: (id) => apiRequest(`/api/v1/orders/${id}`, { method: 'GET' }),
     getTimeline: (id) => apiRequest(`/api/v1/orders/${id}/timeline`, { method: 'GET' }),
     getTracking: (id) => apiRequest(`/api/v1/orders/${id}/tracking`, { method: 'GET' }),
     updateStatus: (id, status) => apiRequest(`/api/v1/orders/${id}/status?status=${status}`, { method: 'PATCH' }),
     cancel: (id) => apiRequest(`/api/v1/orders/${id}/cancel`, { method: 'POST' }),
     returnOrder: (id) => apiRequest(`/api/v1/orders/${id}/return`, { method: 'POST' }),
+    initiateReturn: (id, payload) => apiRequest(`/api/v1/orders/${id}/return`, { method: 'POST', body: payload }),
+    accept: (id) => apiRequest(`/api/v1/orders/${id}/accept`, { method: 'POST' }),
+    reject: (id) => apiRequest(`/api/v1/orders/${id}/reject`, { method: 'POST' }),
+    pack: (id) => apiRequest(`/api/v1/orders/${id}/pack`, { method: 'POST' }),
+    readyPickup: (id) => apiRequest(`/api/v1/orders/${id}/ready-pickup`, { method: 'POST' }),
+    getPackingSlip: (id) => apiRequest(`/api/v1/orders/${id}/packing-slip`, { method: 'GET' }),
+    adminGetOrders: () => apiRequest('/api/v1/orders/admin', { method: 'GET' }),
+    adminGetReturns: () => apiRequest('/api/v1/orders/admin/returns', { method: 'GET' }),
+    adminUpdateReturnStatus: (id, status) => apiRequest(`/api/v1/orders/admin/returns/${id}/status?status=${status}`, { method: 'PUT' }),
+  },
+  get order() { return this.orders; },
+  warehouse: {
+    list: () => apiRequest('/api/v1/warehouses', { method: 'GET' }),
+    getById: (id) => apiRequest(`/api/v1/warehouses/${id}`, { method: 'GET' }),
+    getInventory: (id) => apiRequest(`/api/v1/warehouses/${id}/inventory`, { method: 'GET' }),
+    getMovements: (id) => apiRequest(`/api/v1/warehouses/${id}/movements`, { method: 'GET' }),
+    getAnalytics: (id) => apiRequest(`/api/v1/warehouses/${id}/analytics`, { method: 'GET' }),
+    syncStock: (warehouseId, productId, payload) => apiRequest(`/api/v1/warehouses/${warehouseId}/inventory/${productId}/sync`, { method: 'POST', body: payload }),
+    allocateInventory: (warehouseId, productId) => apiRequest(`/api/v1/warehouses/${warehouseId}/inventory/${productId}`, { method: 'POST' }),
+  },
+  warehouseFulfillments: {
+    getByWarehouse: (warehouseId) => apiRequest(`/api/v1/warehouse-fulfillments/warehouse/${warehouseId}`, { method: 'GET' }),
+    assignStaff: (id) => apiRequest(`/api/v1/warehouse-fulfillments/${id}/assign`, { method: 'PUT' }),
+    updateStatus: (id, status) => apiRequest(`/api/v1/warehouse-fulfillments/${id}/status?status=${encodeURIComponent(status)}`, { method: 'PUT' }),
+    prepareShipment: (id, carrier, trackingNumber) => apiRequest(`/api/v1/warehouse-fulfillments/${id}/prepare-shipment?carrier=${encodeURIComponent(carrier)}&trackingNumber=${encodeURIComponent(trackingNumber)}`, { method: 'POST' }),
+    updateDeliveryStatus: (id, eventType, location, description) => {
+      const params = new URLSearchParams();
+      if (eventType) params.append('eventType', eventType);
+      if (location) params.append('location', location);
+      if (description) params.append('description', description);
+      return apiRequest(`/api/v1/warehouse-fulfillments/${id}/delivery-status?${params.toString()}`, { method: 'POST' });
+    },
+    allocateOrder: (orderId) => apiRequest(`/api/v1/warehouse-fulfillments/allocate/${orderId}`, { method: 'POST' }),
   },
   get order() { return this.orders; },
   payment: {
